@@ -1,0 +1,49 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: aws-registry-credential-cron
+spec:
+  schedule: "* */8 * * *"
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      backoffLimit: 4
+      template:
+        spec:
+          serviceAccountName: default
+          terminationGracePeriodSeconds: 0
+          restartPolicy: Never
+          containers:
+            - name: refresh-aws-credentials
+              imagePullPolicy: IfNotPresent
+              image: bk203/aws-openshift-cli:latest
+              envFrom:
+                - configMapRef:
+                    name: aws-refresh-credentials
+              command:
+                - "/bin/sh"
+                - "-c"
+                - |
+                  DOCKER_REGISTRY_SERVER=https://${AWS_ACCOUNT}.dkr.ecr.${AWS_REGION}.amazonaws.com
+                  DOCKER_USER=AWS
+                  DOCKER_PASSWORD=`aws ecr get-login --region ${AWS_REGION} --registry-ids ${AWS_ACCOUNT} | cut -d' ' -f6`
+                  oc delete secret aws-registry || true
+                  oc create secret docker-registry aws-registry \
+                  --docker-server=$DOCKER_REGISTRY_SERVER \
+                  --docker-username=$DOCKER_USER \
+                  --docker-password=$DOCKER_PASSWORD \
+                  --docker-email=no@email.local
+                  oc patch serviceaccount default -p '{"imagePullSecrets":[{"name":"aws-registry"}]}'
+---
+
+apiVersion: v1
+data:
+  AWS_ACCESS_KEY_ID: 'YOUR_AWS_ID'
+  AWS_SECRET_ACCESS_KEY: 'YOUR_AWS_SECRET'
+  AWS_ACCOUNT: 'YOUR_AWS_ACCOUNT'
+  AWS_REGION: eu-central-1
+
+kind: ConfigMap
+metadata:
+  name: aws-refresh-credentials
