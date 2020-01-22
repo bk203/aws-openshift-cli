@@ -11,6 +11,9 @@ Docker image combining the following tools:
 On OpenShift we deploy a [CronJob](https://docs.openshift.com/container-platform/3.11/dev_guide/cron_jobs.html) that will be responsible for renewing the credentials stored within a secret.
 
 ```
+# Grant privalliages to allow creation of secrets, admin is overpowered still researching
+oc policy add-role-to-user admin system:serviceaccount:{$PROJECT}:default
+
 # From GitHub
 oc create -f https://raw.githubusercontent.com/bk203/aws-openshift-cli/master/cron.yaml
 
